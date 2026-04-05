@@ -4,18 +4,12 @@
 
 ## Windows 다운로드
 
-GitHub 저장소 연결 후 Releases 링크를 이 위치에 넣으면 됩니다.
+[Windows 설치 파일 다운로드](https://github.com/MaSeongJin/label-maker-offline/releases/latest/download/LabelMakerOffline-1.0.0-Setup.exe)
 
-예정 링크 형식:
-
-```text
-https://github.com/<owner>/<repo>/releases/latest/download/LabelMakerOffline-1.0.0-Setup.exe
-```
-
-현재 빌드 산출물 파일명:
+저장소:
 
 ```text
-LabelMakerOffline-1.0.0-Setup.exe
+https://github.com/MaSeongJin/label-maker-offline
 ```
 
 ## 주요 기능
