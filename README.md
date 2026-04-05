@@ -4,7 +4,7 @@
 
 ## Windows 다운로드
 
-[Windows 설치 파일 다운로드](https://github.com/MaSeongJin/label-maker-offline/releases/latest/download/LabelMakerOffline-1.0.1-Setup.exe)
+[Windows 설치 파일 다운로드](https://github.com/MaSeongJin/label-maker-offline/releases/latest/download/LabelMakerOffline-Setup.exe)
 
 저장소:
 
