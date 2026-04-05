@@ -1,0 +1,56 @@
+{
+  "name": "new-project",
+  "version": "1.0.0",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "capture:ui": "node ./scripts/capture-ui.js",
+    "capture:ui:detailed": "node ./scripts/capture-detailed-ui.js",
+    "audit:scroll": "node ./scripts/audit-scroll.js",
+    "build:win": "electron-builder --win nsis --x64",
+    "build:dir": "electron-builder --dir"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "오프라인 라벨 자동생성 데스크톱 앱",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "playwright": "^1.58.2"
+  },
+  "build": {
+    "appId": "com.mijinfood.labelmaker",
+    "productName": "LabelMakerOffline",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "LabelMakerOffline-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

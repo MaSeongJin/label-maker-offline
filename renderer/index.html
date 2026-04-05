@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>라벨 자동생성 오프라인</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="sidebar-top">
+          <nav class="workspace-nav" aria-label="주요 작업">
+            <button type="button" class="tab-button nav-tab active" data-tab="upload">
+              <span class="nav-index">01</span>
+              <span class="nav-copy">
+                <strong>엑셀 업로드</strong>
+              </span>
+            </button>
+            <button type="button" class="tab-button nav-tab" data-tab="labels">
+              <span class="nav-index">02</span>
+              <span class="nav-copy">
+                <strong>라벨 편집</strong>
+              </span>
+            </button>
+            <button type="button" class="tab-button nav-tab" data-tab="print">
+              <span class="nav-index">03</span>
+              <span class="nav-copy">
+                <strong>인쇄·검수</strong>
+              </span>
+            </button>
+          </nav>
+        </div>
+
+        <div class="sidebar-bottom">
+          <div class="sidebar-utility-nav">
+            <button type="button" class="tab-button nav-tab nav-tab-utility" data-tab="masters">
+              <span class="nav-index">관리</span>
+              <span class="nav-copy">
+                <strong>관리 데이터</strong>
+              </span>
+            </button>
+          </div>
+          <button id="save-button" class="primary sidebar-save-button">저장</button>
+          <p id="meta-text" class="meta-text">로컬 저장소 연결 중...</p>
+        </div>
+      </aside>
+
+      <div class="workspace-shell">
+        <header class="app-header">
+          <div class="header-copy">
+            <p id="workspace-eyebrow" class="header-eyebrow">Workspace</p>
+            <h2 id="workspace-title">엑셀 업로드 및 작업표</h2>
+            <p id="workspace-description" class="workspace-description">
+              원본 엑셀을 불러오고 필수 데이터만 추출해 라벨 생성 준비를 진행합니다.
+            </p>
+          </div>
+
+          <div class="header-metrics">
+            <article class="metric-card">
+              <span id="metric-imports-label" class="metric-label">추출 데이터</span>
+              <strong id="metric-imports" class="metric-value">0건</strong>
+            </article>
+            <article class="metric-card">
+              <span id="metric-labels-label" class="metric-label">생성 라벨</span>
+              <strong id="metric-labels" class="metric-value">0장</strong>
+            </article>
+            <article class="metric-card metric-card-warning">
+              <span id="metric-warnings-label" class="metric-label">경고 현황</span>
+              <strong id="metric-warnings" class="metric-value">0건 · 0행</strong>
+            </article>
+            <article class="metric-card metric-card-muted">
+              <span id="metric-stage-label" class="metric-label">현재 단계</span>
+              <strong id="metric-stage" class="metric-value">엑셀 업로드</strong>
+            </article>
+          </div>
+        </header>
+
+        <main class="app-main">
+          <section id="tab-upload" class="tab-panel active">
+            <div class="workspace-stack">
+              <section class="panel-card hero-panel upload-hero">
+                <div class="panel-topline">
+                  <div>
+                    <p class="panel-kicker">원본 주문 데이터</p>
+                    <h3>엑셀 업로드</h3>
+                  </div>
+                </div>
+
+                <div class="upload-toolbar">
+                  <section class="upload-block upload-source-block">
+                    <div class="upload-block-head">
+                      <div>
+                        <strong class="upload-block-title">원본 엑셀 업로드</strong>
+                      </div>
+                    </div>
+
+                    <label class="file-picker" for="excel-file">
+                      <span class="file-picker-row">
+                        <span class="file-picker-trigger">엑셀 파일 선택</span>
+                        <span id="file-picker-name" class="file-picker-name is-empty">선택된 파일 없음</span>
+                      </span>
+                      <input class="file-picker-input" type="file" id="excel-file" accept=".xlsx,.xls" />
+                    </label>
+                  </section>
+
+                  <section class="upload-block upload-actions-block">
+                    <div class="upload-block-head">
+                      <div>
+                        <strong class="upload-block-title">업로드 액션</strong>
+                      </div>
+                    </div>
+
+                    <div class="upload-action-grid">
+                      <button id="parse-button">엑셀 파싱</button>
+                      <button id="cancel-upload-button" class="secondary">업로드 취소</button>
+                      <button id="clear-imports-button" class="danger">전체 삭제</button>
+                      <button id="generate-labels-button" class="primary">선택 행 라벨 생성</button>
+                    </div>
+                  </section>
+                </div>
+              </section>
+
+              <section class="panel-card data-panel">
+                <div class="panel-topline">
+                  <div>
+                    <p class="panel-kicker">작업표</p>
+                    <h3>추출 데이터</h3>
+                  </div>
+                </div>
+
+                <div class="table-tools">
+                  <input id="import-search" type="text" placeholder="식당, 상품명, 비고 검색" />
+                  <select id="import-sort">
+                    <option value="modified-desc">수정시간 최신순</option>
+                    <option value="supply-desc">납품일자 최신순</option>
+                    <option value="supply-asc">납품일자 오래된순</option>
+                    <option value="qty-desc">수량 큰순</option>
+                    <option value="qty-asc">수량 작은순</option>
+                    <option value="restaurant-asc">식당명 가나다순</option>
+                  </select>
+                  <label class="check-inline">
+                    <input id="import-warning-only" type="checkbox" />
+                    경고 행만 보기
+                  </label>
+                  <button id="select-visible-button" class="secondary">보이는 행 전체 선택</button>
+                  <button id="clear-selection-button" class="secondary">선택 해제</button>
+                </div>
+
+                <div class="table-wrap import-table-wrap">
+                  <table id="imports-table">
+                    <thead>
+                      <tr>
+                        <th>선택</th>
+                        <th>경고</th>
+                        <th>납품일자</th>
+                        <th>식당</th>
+                        <th>상품명</th>
+                        <th>단위</th>
+                        <th>수량</th>
+                        <th>비고</th>
+                        <th>수정시간</th>
+                      </tr>
+                    </thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section id="tab-masters" class="tab-panel">
+            <div class="workspace-stack">
+              <section class="panel-card masters-overview">
+                <div class="panel-topline">
+                  <div>
+                    <p class="panel-kicker">자동 바인딩 기준</p>
+                    <h3>관리 데이터</h3>
+                  </div>
+                </div>
+                <div id="master-menu" class="master-menu" role="tablist" aria-label="관리 데이터 메뉴"></div>
+              </section>
+
+              <div id="master-defaults-panel" class="panel-card defaults-panel">
+                <div class="panel-topline">
+                  <div>
+                    <p class="panel-kicker">공통 기본값</p>
+                    <h3>기본값 프로필</h3>
+                  </div>
+                </div>
+                <div class="table-wrap defaults-table-wrap">
+                  <table class="defaults-table">
+                    <tbody>
+                      <tr>
+                        <th>제조원</th>
+                        <td><input id="default-manufacturer" type="text" /></td>
+                        <th>판매원</th>
+                        <td><input id="default-seller" type="text" /></td>
+                      </tr>
+                      <tr>
+                        <th>식품유형</th>
+                        <td><input id="default-food-type" type="text" /></td>
+                        <th>허가번호</th>
+                        <td><input id="default-license-no" type="text" /></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="master-tables"></div>
+            </div>
+          </section>
+
+          <section id="tab-labels" class="tab-panel">
+            <div class="labels-layout">
+              <aside class="labels-list panel-card">
+                <div class="label-list-header">
+                  <div>
+                    <p class="panel-kicker">라벨 그룹</p>
+                    <h3>생성 라벨 목록</h3>
+                  </div>
+                  <button id="clear-labels" class="danger">전체 삭제</button>
+                </div>
+                <ul id="labels-list"></ul>
+              </aside>
+
+              <section class="label-editor panel-card">
+                <div class="label-editor-header">
+                  <div>
+                    <p class="panel-kicker">세부 수정</p>
+                    <h3>라벨 편집</h3>
+                  </div>
+                  <p class="hint">자동 바인딩 후 수정한 필드는 해당 칸만 반영됩니다.</p>
+                </div>
+                <div id="label-source-panel" class="label-source-panel"></div>
+                <div id="label-warning-panel" class="label-warning-panel"></div>
+                <form id="label-form" class="label-form"></form>
+              </section>
+            </div>
+          </section>
+
+          <section id="tab-print" class="tab-panel">
+            <div class="workspace-stack">
+              <section class="panel-card print-toolbar">
+                <div>
+                  <p class="panel-kicker">출력 준비</p>
+                  <h3>인쇄 미리보기</h3>
+                  <p id="print-summary" class="summary-text">라벨 0장</p>
+                </div>
+                <button id="print-button" class="primary">인쇄</button>
+              </section>
+
+              <section class="panel-card print-canvas-card">
+                <div class="panel-topline">
+                  <div>
+                    <p class="panel-kicker">출력 캔버스</p>
+                    <h3>9cm x 7.5cm 라벨 시트</h3>
+                  </div>
+                  <p class="panel-note">실제 출력 규격은 그대로 유지하고, 검수 흐름만 더 읽기 쉽게 정리합니다.</p>
+                </div>
+                <div id="print-area" class="print-area"></div>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <div id="print-check-modal" class="modal-backdrop" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="print-check-title">
+        <h3 id="print-check-title">인쇄 전 검수</h3>
+        <p id="print-check-summary" class="summary-text"></p>
+        <div id="print-check-label-box" class="label-group-box"></div>
+        <div id="print-check-warning-box" class="warning-box"></div>
+        <div class="modal-actions">
+          <button id="print-check-go-labels" class="secondary">경고 라벨 편집</button>
+          <button id="print-check-cancel" class="secondary">취소</button>
+          <button id="print-check-confirm" class="primary">인쇄 진행</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="master-sync-modal" class="modal-backdrop" hidden>
+      <div class="modal-card master-sync-modal-card" role="dialog" aria-modal="true" aria-labelledby="master-sync-title">
+        <h3 id="master-sync-title">관리 데이터 반영</h3>
+        <p id="master-sync-message" class="summary-text"></p>
+        <div id="master-sync-list" class="master-sync-list"></div>
+        <div class="modal-actions">
+          <button id="master-sync-cancel" class="secondary">아니오</button>
+          <button id="master-sync-confirm" class="primary">네, 반영</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="../node_modules/xlsx/dist/xlsx.full.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
