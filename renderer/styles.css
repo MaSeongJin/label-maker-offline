@@ -1167,9 +1167,9 @@ tbody tr.warning-row {
 .label-sheet {
   width: 9cm;
   height: 7.5cm;
-  border: 1.3px solid #1f2022;
-  border-radius: 3px;
-  padding: 0.11cm;
+  border: 1.8px solid #111317;
+  border-radius: 0;
+  padding: 0.06cm;
   background: #fff;
   color: #111317;
   box-shadow: none;
@@ -1180,7 +1180,7 @@ tbody tr.warning-row {
   height: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 8.6px;
+  font-size: 9.4px;
 }
 
 .label-table col.col-key {
@@ -1193,87 +1193,87 @@ tbody tr.warning-row {
 
 .label-table th,
 .label-table td {
-  border: 1px solid #1f2022;
-  padding: 0.03cm 0.06cm;
+  border: 1.35px solid #111317;
+  padding: 0.035cm 0.07cm;
   vertical-align: middle;
   position: static;
   top: auto;
   z-index: auto;
   background: #fff;
-  line-height: 1.08;
+  line-height: 1.04;
 }
 
 .label-table th {
   text-align: center;
-  font-weight: 700;
-  color: #20252d;
-  letter-spacing: 0.01em;
-  font-size: 8.2px;
+  font-weight: 900;
+  color: #111317;
+  letter-spacing: 0;
+  font-size: 9.3px;
   white-space: nowrap;
 }
 
 .label-table td {
   text-align: center;
-  font-weight: 600;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   word-break: keep-all;
 }
 
 .label-table tr.top-row th {
-  font-size: 0.48cm;
-  height: 0.8cm;
+  font-size: 0.43cm;
+  height: 0.78cm;
 }
 
 .label-table td.main-target {
-  font-size: 0.55cm;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+  font-size: 0.58cm;
+  font-weight: 900;
+  letter-spacing: 0;
   line-height: 1.02;
 }
 
 .label-table td.weight-value {
   font-size: 0.5cm;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+  font-weight: 900;
+  letter-spacing: 0;
 }
 
 .label-table td.maker {
   text-align: left;
-  font-size: 8px;
-  font-weight: 600;
+  font-size: 8.5px;
+  font-weight: 800;
   padding-left: 0.08cm;
 }
 
 .label-table td.numeric-cell {
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .label-table tr:not(.top-row):not(.notice-row) th,
 .label-table tr:not(.top-row):not(.notice-row) td {
-  height: 0.48cm;
+  height: 0.5cm;
 }
 
 .label-table td.notice-cell {
   padding: 0;
-  border-top-width: 1.2px;
+  border-top-width: 1.6px;
   text-align: left;
 }
 
 .label-notice-wrap {
   position: relative;
-  height: 1.62cm;
-  padding: 0.04cm 1.56cm 0.04cm 0.03cm;
+  height: 1.52cm;
+  padding: 0.04cm 1.44cm 0.04cm 0.06cm;
 }
 
 .label-notice-list {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 7.4px;
+  font-size: 7.7px;
   line-height: 1.15;
-  color: #1e232a;
-  max-height: 1.54cm;
+  color: #111317;
+  max-height: 1.44cm;
   overflow: hidden;
   text-align: left;
   white-space: nowrap;
@@ -1283,13 +1283,18 @@ tbody tr.warning-row {
   margin: 0;
 }
 
+.label-notice-list li::before {
+  content: '▶ ';
+  font-weight: 900;
+}
+
 .label-stamp {
   position: absolute;
   display: block;
   right: 0.08cm;
   bottom: 0.05cm;
-  width: 1.34cm;
-  height: 1.34cm;
+  width: 1.22cm;
+  height: 1.22cm;
   object-fit: contain;
   object-position: center;
   background: #fff;
@@ -2138,6 +2143,14 @@ tbody tr.warning-row {
   background: rgba(255, 255, 255, 0.98);
 }
 
+.defaults-panel {
+  width: min(1120px, 100%);
+}
+
+.defaults-table {
+  table-layout: fixed;
+}
+
 .defaults-table th,
 .defaults-table td {
   padding: 8px 10px;
@@ -2785,10 +2798,97 @@ button.label-list-card.active.has-warning {
   margin-bottom: 10px;
 }
 
+#tab-print .workspace-stack {
+  overflow: hidden;
+}
+
+.print-canvas-card {
+  overflow: hidden;
+}
+
 .print-area {
-  grid-template-columns: repeat(auto-fill, minmax(318px, 1fr));
-  gap: 12px;
-  padding-top: 6px;
+  --print-preview-scale: 0.56;
+  --print-preview-width: calc(9cm * var(--print-preview-scale));
+  --print-preview-height: calc(7.5cm * var(--print-preview-scale));
+  flex: 1 1 auto;
+  min-height: 0;
+  display: block;
+  overflow: auto;
+  padding: 6px 8px 10px;
+  border-radius: 18px;
+  overscroll-behavior: contain;
+}
+
+.print-preview-sheets,
+.print-output-sheets {
+  display: grid;
+  align-items: start;
+}
+
+.print-preview-sheets {
+  grid-template-columns: repeat(5, var(--print-preview-width));
+  justify-content: center;
+  gap: 6px 5px;
+}
+
+.print-output-sheets {
+  grid-template-columns: repeat(auto-fill, 9cm);
+  gap: 0.2cm;
+}
+
+.print-output-sheets {
+  display: none;
+}
+
+.print-area.is-printing .print-preview-sheets {
+  display: none;
+}
+
+.print-area.is-printing .print-output-sheets {
+  display: grid;
+}
+
+.print-preview-item {
+  position: relative;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  width: var(--print-preview-width);
+  min-width: 0;
+}
+
+.print-preview-sheet-frame {
+  position: relative;
+  width: var(--print-preview-width);
+  height: var(--print-preview-height);
+  flex: 0 0 auto;
+}
+
+.print-preview-sheet-frame .label-sheet {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  transform: scale(var(--print-preview-scale));
+  transform-origin: top left;
+}
+
+.print-preview-count-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(49, 130, 246, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
 }
 
 .modal-card {
@@ -3060,8 +3160,29 @@ button.label-list-card.active.has-warning {
     background: #fff;
   }
 
+  #tab-print .workspace-stack,
+  .print-canvas-card {
+    overflow: visible !important;
+  }
+
   .print-area {
+    display: block;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible !important;
+    padding: 0;
+  }
+
+  .print-preview-sheets {
+    display: none !important;
+  }
+
+  .print-output-sheets {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, 9cm);
     gap: 0.2cm;
+    align-items: start;
   }
 
   .label-sheet {

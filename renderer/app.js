@@ -113,8 +113,38 @@ const DEFAULT_STORE = {
 };
 
 const KOREAN_WEEK_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
-const FISH_KEYWORDS = ['고등어', '오징어', '코다리', '임연수', '연어', '명태', '갈치', '삼치', '대구'];
-const ORIGIN_KEYWORDS = ['국내산', '중국산', '러시아산', '미국산', '호주산', '캐나다산', '뉴질랜드산', '베트남산', '칠레산', '노르웨이산'];
+const PRINT_PREVIEW_COLUMNS = 5;
+const PRINT_PREVIEW_COLUMN_GAP_PX = 5;
+const FISH_KEYWORDS = [
+  '고등어',
+  '오징어',
+  '코다리',
+  '임연수',
+  '연어',
+  '명태',
+  '갈치',
+  '삼치',
+  '대구',
+  '새우살',
+  '모듬해물',
+  '새우',
+  '해물',
+  '게',
+];
+const ORIGIN_KEYWORDS = [
+  '국내산',
+  '중국산',
+  '러시아산',
+  '미국산',
+  '호주산',
+  '캐나다산',
+  '뉴질랜드산',
+  '베트남산',
+  '칠레산',
+  '노르웨이산',
+  '브라질산',
+  '인도산',
+];
 const FLOW_STEPS = [
   { tab: 'upload', title: '엑셀 업로드' },
   { tab: 'masters', title: '관리 데이터' },
@@ -212,6 +242,7 @@ async function init() {
   state.store = sanitizeStore(loadedStore || DEFAULT_STORE);
   state.selectedImportIds = new Set(state.store.imports.map((row) => row.id));
   refreshImportDiagnostics();
+  refreshGeneratedLabelsFromSources();
 
   updateLayoutOffsets();
   renderEverything();
@@ -323,9 +354,22 @@ function bindToolbarActions() {
 
   window.addEventListener('resize', () => {
     updateLayoutOffsets();
-    if (state.activeTab === 'labels') {
-      requestAnimationFrame(fitPrintSheetText);
+    if (state.activeTab === 'print') {
+      requestAnimationFrame(() => {
+        updatePrintPreviewScale();
+        fitPrintSheetText();
+      });
     }
+  });
+
+  window.addEventListener('beforeprint', () => {
+    refs.printArea?.classList.add('is-printing');
+    fitPrintSheetText();
+  });
+
+  window.addEventListener('afterprint', () => {
+    refs.printArea?.classList.remove('is-printing');
+    requestAnimationFrame(updatePrintPreviewScale);
   });
 }
 
@@ -623,12 +667,8 @@ function bindLabelActions() {
       setLabelFieldValue(selectedLabel, fieldKey, target.value, { manual: true });
     }
 
-    syncLinkedLabelFields(selectedLabel, fieldKey);
+    syncLabelDependenciesAfterChange(selectedLabel, fieldKey);
     selectedLabel.updatedAt = new Date().toISOString();
-
-    if (fieldKey === 'packagingType') {
-      recalculateShelfLife(selectedLabel);
-    }
 
     applyWarnings(selectedLabel);
 
@@ -1124,8 +1164,8 @@ function createLabelsFromImportRow(row) {
   const manufactureDate =
     labelType === '어류' ? calcFishManufactureDate(row.supplyDate) : calcMeatManufactureDate(row.supplyDate);
 
-  const productReport = findProductReportByItemName(itemName);
-  const traceability = findTraceabilityByItemName(itemName, row.quantity);
+  const productReport = labelType === '육류' ? findProductReportByItemName(itemName) : null;
+  const traceability = labelType === '육류' ? findTraceabilityByItemName(itemName, row.quantity) : null;
 
   const created = splits.map((pieceWeight, index) => {
     const fields = {
@@ -1185,6 +1225,10 @@ function createLabelsFromImportRow(row) {
 function recalculateShelfLife(label) {
   const fields = label.fields;
 
+  if (label.manualOverrides?.shelfLifeDate) {
+    return;
+  }
+
   if (!fields.manufactureDate) {
     fields.shelfLifeDate = '';
     return;
@@ -1209,6 +1253,89 @@ function recalculateShelfLife(label) {
   fields.shelfLifeDate = formatDate(addDays(baseDate, plusDays));
 }
 
+function updateLabelStorageMethod(label) {
+  const storageType = label.fields.storageType === '냉동' ? '냉동' : '냉장';
+  syncLinkedFieldValue(
+    label,
+    'storageMethod',
+    storageType === '냉동' ? "-18'C 이하 냉동보관" : "-2'C ~ -5'C 냉장보관"
+  );
+}
+
+function extractDateText(value) {
+  const match = trimText(value).match(/(\d{4}-\d{1,2}-\d{1,2})/);
+  const parsedDate = match ? parseDate(match[1]) : null;
+  return parsedDate ? formatDate(parsedDate) : '';
+}
+
+function updateLabelDeliveryDateFields(label, fieldKey) {
+  if (fieldKey === 'deliveryDateWithWeekday') {
+    const dateText = extractDateText(label.fields.deliveryDateWithWeekday);
+    if (dateText) {
+      label.fields.deliveryDate = dateText;
+    }
+  }
+
+  const deliveryDate = extractDateText(label.fields.deliveryDate) || extractDateText(label.fields.deliveryDateWithWeekday);
+  if (!deliveryDate) {
+    return;
+  }
+
+  label.fields.deliveryDate = deliveryDate;
+  syncLinkedFieldValue(label, 'deliveryDateWithWeekday', `${deliveryDate} (${weekdayText(deliveryDate)})`);
+}
+
+function updateLabelManufactureDateFromDelivery(label) {
+  const deliveryDate = extractDateText(label.fields.deliveryDate) || extractDateText(label.fields.deliveryDateWithWeekday);
+  if (!deliveryDate) {
+    return;
+  }
+
+  const nextManufactureDate =
+    label.fields.labelType === '어류' ? calcFishManufactureDate(deliveryDate) : calcMeatManufactureDate(deliveryDate);
+  syncLinkedFieldValue(label, 'manufactureDate', nextManufactureDate);
+}
+
+function updateLabelNotice(label) {
+  syncLinkedFieldValue(label, 'fixedNotice', label.fields.labelType === '어류' ? FISH_NOTICE : MEAT_NOTICE);
+}
+
+function syncLabelDependenciesAfterChange(label, fieldKey) {
+  if (!label?.fields) {
+    return;
+  }
+
+  if (fieldKey === 'deliveryDate' || fieldKey === 'deliveryDateWithWeekday' || fieldKey === 'labelType') {
+    updateLabelDeliveryDateFields(label, fieldKey);
+  }
+
+  if (fieldKey === 'deliveryDate' || fieldKey === 'deliveryDateWithWeekday' || fieldKey === 'labelType') {
+    updateLabelManufactureDateFromDelivery(label);
+  }
+
+  if (fieldKey === 'labelType') {
+    updateLabelNotice(label);
+    syncLinkedLabelFields(label, 'itemName');
+  } else {
+    syncLinkedLabelFields(label, fieldKey);
+  }
+
+  if (fieldKey === 'storageType' || fieldKey === 'labelType') {
+    updateLabelStorageMethod(label);
+  }
+
+  if (
+    fieldKey === 'labelType'
+    || fieldKey === 'storageType'
+    || fieldKey === 'packagingType'
+    || fieldKey === 'manufactureDate'
+    || fieldKey === 'deliveryDate'
+    || fieldKey === 'deliveryDateWithWeekday'
+  ) {
+    recalculateShelfLife(label);
+  }
+}
+
 function applyWarnings(label) {
   const warnings = [];
   const fields = label.fields;
@@ -1231,14 +1358,76 @@ function refreshImportDiagnostics() {
   }, {});
 }
 
+function refreshGeneratedLabelsFromSources() {
+  if (!state.store.imports.length || !state.store.labels.length) {
+    return;
+  }
+
+  const sourceRows = new Map(state.store.imports.map((row) => [row.id, row]));
+  const generatedBySourceId = new Map();
+
+  state.store.labels.forEach((label) => {
+    const sourceRow = sourceRows.get(label.sourceRowId);
+    if (!sourceRow) {
+      applyWarnings(label);
+      return;
+    }
+
+    if (!generatedBySourceId.has(sourceRow.id)) {
+      generatedBySourceId.set(sourceRow.id, createLabelsFromImportRow(sourceRow));
+    }
+
+    const generatedLabels = generatedBySourceId.get(sourceRow.id);
+    const referenceLabel =
+      generatedLabels.find((item) => item.splitIndex === label.splitIndex) || generatedLabels[label.splitIndex - 1];
+
+    if (!referenceLabel) {
+      applyWarnings(label);
+      return;
+    }
+
+    syncAutoGeneratedLabelFields(label, referenceLabel);
+    applyWarnings(label);
+  });
+}
+
+function syncAutoGeneratedLabelFields(label, referenceLabel) {
+  const manualOverrides = label.manualOverrides || {};
+  let changed = false;
+
+  label.fields = typeof label.fields === 'object' && label.fields ? label.fields : {};
+  label.manualOverrides = manualOverrides;
+
+  Object.entries(referenceLabel.fields).forEach(([fieldKey, nextValue]) => {
+    if (manualOverrides[fieldKey]) {
+      return;
+    }
+
+    if (label.fields[fieldKey] !== nextValue) {
+      label.fields[fieldKey] = nextValue;
+      changed = true;
+    }
+  });
+
+  if (label.splitCount !== referenceLabel.splitCount) {
+    label.splitCount = referenceLabel.splitCount;
+    changed = true;
+  }
+
+  if (changed) {
+    label.updatedAt = new Date().toISOString();
+  }
+}
+
 function analyzeImportRow(row) {
   const labelType = detectLabelType(row.productName);
   const itemName = findStandardItemName(row.productName, labelType);
   const origin = detectOrigin(row.productName);
-  const report = findProductReportByItemName(itemName);
-  const traceability = findTraceabilityByItemName(itemName, row.quantity);
+  const report = labelType === '육류' ? findProductReportByItemName(itemName) : null;
+  const traceability = labelType === '육류' ? findTraceabilityByItemName(itemName, row.quantity) : null;
   const warnings = [];
 
+  if (!itemName) warnings.push('품명 미매핑');
   if (!origin) warnings.push('원산지 미매핑');
   if (labelType === '육류' && !report?.reportNo) warnings.push('품목제조보고번호 미매핑');
   if (labelType === '육류' && !traceability?.traceNo) warnings.push('이력번호 미매핑');
@@ -1546,12 +1735,12 @@ function applyProductReportToLabel(label, row, options = {}) {
 
 function clearProductReportFields(label) {
   if (!label.manualOverrides.reportNo) {
-    label.fields.reportNo = '';
+    label.fields.reportNo = label.fields.labelType === '어류' ? '2025027955015' : '';
     delete label.manualOverrides.reportNo;
   }
 
   if (!label.manualOverrides.productType) {
-    label.fields.productType = '';
+    label.fields.productType = label.fields.labelType === '어류' ? '기타수산물가공품' : '';
     delete label.manualOverrides.productType;
   }
 
@@ -1559,6 +1748,8 @@ function clearProductReportFields(label) {
     label.fields.ingredients =
       label.fields.labelType === '어류' && trimText(label.fields.itemName)
         ? `${trimText(label.fields.itemName)} 100%`
+        : label.fields.labelType === '어류'
+          ? '어류 100%'
         : '';
     delete label.manualOverrides.ingredients;
   }
@@ -1590,6 +1781,12 @@ function clearTraceabilityFields(label) {
 
 function syncLinkedLabelFields(label, fieldKey) {
   if (fieldKey === 'itemName') {
+    if (label.fields.labelType !== '육류') {
+      clearProductReportFields(label);
+      clearTraceabilityFields(label);
+      return;
+    }
+
     const productReportCandidates = getProductReportCandidates(label.fields.itemName);
     const currentReportRow = productReportCandidates.find(
       (row) => trimText(row.reportNo) && trimText(row.reportNo) === trimText(label.fields.reportNo)
@@ -1630,6 +1827,11 @@ function syncLinkedLabelFields(label, fieldKey) {
   }
 
   if (fieldKey === 'traceNo') {
+    if (label.fields.labelType !== '육류') {
+      clearTraceabilityFields(label);
+      return;
+    }
+
     const selectedTraceability = getTraceabilityCandidates(label.fields.itemName, getRequiredTraceabilityKg(label)).find(
       (row) => trimText(row.traceNo) === trimText(label.fields.traceNo)
     );
@@ -3026,11 +3228,45 @@ function renderPrintArea() {
     return;
   }
 
-  refs.printArea.innerHTML = state.store.labels.map((label) => renderPrintSheet(label)).join('');
-  requestAnimationFrame(fitPrintSheetText);
+  const groups = collectLabelGroups();
+  const previewHtml = groups
+    .map((group) => renderPrintPreviewGroup(group))
+    .join('');
+  const outputHtml = state.store.labels.map((label) => renderPrintSheet(label)).join('');
+
+  refs.printArea.innerHTML = `
+    <div class="print-preview-sheets">
+      ${previewHtml}
+    </div>
+    <div class="print-output-sheets" aria-hidden="true">
+      ${outputHtml}
+    </div>
+  `;
+  requestAnimationFrame(() => {
+    updatePrintPreviewScale();
+    fitPrintSheetText();
+  });
 
   const warningLabels = state.store.labels.filter((label) => label.warnings.length > 0).length;
-  refs.printSummary.textContent = `라벨 ${state.store.labels.length}장 | 경고 라벨 ${warningLabels}장`;
+  refs.printSummary.textContent =
+    `라벨 ${state.store.labels.length}장 | 미리보기 ${groups.length}종 | 경고 라벨 ${warningLabels}장`;
+}
+
+function renderPrintPreviewGroup(group) {
+  const label = group.representative;
+  const countBadge =
+    group.count > 1
+      ? `<span class="print-preview-count-badge">${group.count}장</span>`
+      : '';
+
+  return `
+    <div class="print-preview-item">
+      <div class="print-preview-sheet-frame">
+        ${countBadge}
+        ${renderPrintSheet(label)}
+      </div>
+    </div>
+  `;
 }
 
 function renderPrintSheet(label) {
@@ -3166,9 +3402,36 @@ function valueOrDash(value) {
   return text || '-';
 }
 
+function updatePrintPreviewScale() {
+  if (!refs.printArea || refs.printArea.classList.contains('is-printing')) {
+    return;
+  }
+
+  const previewSheet = refs.printArea.querySelector('.print-preview-sheet-frame .label-sheet');
+  if (!(previewSheet instanceof HTMLElement) || previewSheet.offsetWidth <= 0) {
+    return;
+  }
+
+  const areaStyles = window.getComputedStyle(refs.printArea);
+  const paddingX =
+    Number.parseFloat(areaStyles.paddingLeft || '0') +
+    Number.parseFloat(areaStyles.paddingRight || '0');
+  const availableWidth = refs.printArea.clientWidth - paddingX;
+  const totalGap = PRINT_PREVIEW_COLUMN_GAP_PX * (PRINT_PREVIEW_COLUMNS - 1);
+  const targetLabelWidth = (availableWidth - totalGap) / PRINT_PREVIEW_COLUMNS;
+
+  if (!Number.isFinite(targetLabelWidth) || targetLabelWidth <= 0) {
+    return;
+  }
+
+  const scale = Math.max(0.28, targetLabelWidth / previewSheet.offsetWidth);
+  refs.printArea.style.setProperty('--print-preview-scale', scale.toFixed(3));
+}
+
 function fitPrintSheetText() {
-  const labelsTab = document.getElementById('tab-labels');
-  if (!labelsTab?.classList.contains('active') || refs.printArea.clientWidth <= 0) {
+  const printTab = document.getElementById('tab-print');
+  const isPrintActive = printTab?.classList.contains('active') || refs.printArea?.classList.contains('is-printing');
+  if (!isPrintActive || refs.printArea.clientWidth <= 0) {
     return;
   }
 
@@ -3287,6 +3550,8 @@ async function executePrintFromCheck() {
   logPrintAudit(report, forced);
   await saveStoreNow();
   closePrintCheckModal();
+  refs.printArea.classList.add('is-printing');
+  fitPrintSheetText();
   window.print();
   notify(forced ? '경고 상태로 인쇄를 강행했습니다.' : '인쇄를 시작했습니다.', forced ? 'warning' : 'success');
 }
@@ -3340,8 +3605,11 @@ function switchTab(tabName) {
     panel.classList.toggle('active', panel.id === `tab-${tabName}`);
   });
   renderHeaderMetrics();
-  if (tabName === 'labels') {
-    requestAnimationFrame(fitPrintSheetText);
+  if (tabName === 'print') {
+    requestAnimationFrame(() => {
+      updatePrintPreviewScale();
+      fitPrintSheetText();
+    });
   }
 }
 
@@ -3582,12 +3850,18 @@ function findPackUnitKg(restaurantName) {
   }
 
   const original = normalizeRestaurantName(restaurantName);
-  const exact = rows.find((row) => normalizeRestaurantName(row.branchName) === original);
+  const exact = rows.find((row) => {
+    const branchName = normalizeRestaurantName(row.branchName);
+    return branchName && branchName === original;
+  });
   if (exact) {
     return parseNumber(exact.packKg);
   }
 
-  const partial = rows.find((row) => original.includes(normalizeRestaurantName(row.branchName)));
+  const partial = rows.find((row) => {
+    const branchName = normalizeRestaurantName(row.branchName);
+    return branchName && original.includes(branchName);
+  });
   if (partial) {
     return parseNumber(partial.packKg);
   }
@@ -3605,15 +3879,14 @@ function normalizeRestaurantName(value) {
 
 function detectLabelType(productName) {
   const text = String(productName || '');
-  if (FISH_KEYWORDS.some((keyword) => text.includes(keyword))) {
-    return '어류';
+  const matchedMaster = getItemNameCandidates(text)[0];
+  const matchedType = trimText(matchedMaster?.type);
+
+  if (matchedType === '어류' || matchedType === '육류') {
+    return matchedType;
   }
 
-  const matchInMaster = state.store.masters.itemNames.find(
-    (row) => row.keyword && text.includes(row.keyword) && row.type === '어류'
-  );
-
-  return matchInMaster ? '어류' : '육류';
+  return FISH_KEYWORDS.some((keyword) => text.includes(keyword)) ? '어류' : '육류';
 }
 
 function detectStorageType(productName) {
@@ -3624,7 +3897,12 @@ function detectStorageType(productName) {
 function detectOrigin(productName) {
   const text = String(productName || '');
   const found = ORIGIN_KEYWORDS.find((origin) => text.includes(origin));
-  return found || '';
+  if (found) {
+    return found;
+  }
+
+  const matched = text.match(/[가-힣A-Za-z]{2,}산/g);
+  return matched?.[0] || '';
 }
 
 function detectUsage(productName) {
@@ -3662,8 +3940,7 @@ function findStandardItemName(productName, labelType) {
     return trimText(matched.standardName);
   }
 
-  const firstPart = text.split('(')[0].trim();
-  return firstPart;
+  return '';
 }
 
 function findProductReportByItemName(itemName) {
